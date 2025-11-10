@@ -91,6 +91,21 @@
         const fileInput = document.getElementById('file-input');
         const dropZone = document.getElementById('drop-zone');
         const feedbackArea = document.getElementById('feedback-area');
+
+        // Make the visible button open the hidden file input immediately.
+        // Some browsers handle clicks on interactive elements nested within a <label>
+        // differently which can cause delays. Triggering the input directly
+        // on the button's click gives a consistent fast response.
+        const selectButton = document.querySelector('.upload-button');
+        if (selectButton) {
+            selectButton.addEventListener('click', (e) => {
+                // Prevent the event from bubbling to the label which may
+                // cause browser-dependent behavior; rely on the explicit click.
+                e.stopPropagation();
+                // Programmatic click from a user gesture will open the file picker.
+                fileInput.click();
+            });
+        }
         
         // File Info Elements
         const elFileName = document.getElementById('file-name');
