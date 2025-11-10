@@ -1,0 +1,265 @@
+<!DOCTYPE html>
+<html lang="en-GB">
+<head>
+    <meta charset="UTF-DBF">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TicTac Uploader</title>
+    
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background-color: #f0f2f5;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            margin: 0;
+            color: #333;
+        }
+        .uploader-container {
+            background-color: #ffffff;
+            border-radius: 12px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+            width: 90%;
+            max-width: 600px;
+            padding: 2rem;
+            text-align: center;
+        }
+        .header {
+            font-size: 2.5rem;
+            font-weight: 800;
+            color: #000;
+        }
+        .header span:first-child { color: #ff0050; /* TikTok Red */ }
+        .header span:last-child { color: #00f2ea; /* TikTok Cyan */ }
+        
+        .upload-box {
+            border: 3px dashed #d9d9d9;
+            border-radius: 8px;
+            padding: 2rem;
+            margin-top: 2rem;
+            cursor: pointer;
+            transition: border-color 0.3s, background-color 0.3s;
+        }
+        .upload-box:hover {
+            border-color: #ff0050;
+            background-color: #fafafa;
+        }
+        .upload-icon {
+            font-size: 3rem;
+            color: #888;
+        }
+        .upload-text {
+            font-size: 1.1rem;
+            font-weight: 600;
+            margin-top: 1rem;
+        }
+        .upload-subtext {
+            font-size: 0.9rem;
+            color: #666;
+            margin-top: 0.5rem;
+        }
+        
+        /* Hide the actual file input */
+        #file-input {
+            display: none;
+        }
+        
+        /* Feedback Area */
+        #feedback-area {
+            margin-top: 2rem;
+            text-align: left;
+            font-size: 0.95rem;
+            line-height: 1.6;
+            min-height: 150px;
+            background-color: #f9f9f9;
+            border: 1px solid #eee;
+            border-radius: 8px;
+            padding: 1.5rem;
+            display: none; /* Hidden by default */
+        }
+        #feedback-area h3 {
+            margin-top: 0;
+            font-weight: 700;
+            color: #000;
+        }
+        .feedback-item {
+            display: flex;
+            justify-content: space-between;
+            padding: 0.5rem 0;
+            border-bottom: 1px solid #eee;
+        }
+        .feedback-item span:first-child {
+            font-weight: 600;
+        }
+        .status {
+            font-weight: 700;
+            padding: 0.2rem 0.5rem;
+            border-radius: 4px;
+        }
+        .status.success {
+            color: #28a745;
+            background-color: #e2f5e6;
+        }
+        .status.error {
+            color: #d93025;
+            background-color: #fce8e6;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="uploader-container">
+        <div class="header">
+            <span>Tic</span><span>Tac</span>
+        </div>
+        
+        <label for="file-input">
+            <div class="upload-box" id="drop-zone">
+                <div class="upload-icon">☁️</div>
+                <div class="upload-text">Select video file to upload</div>
+                <div class="upload-subtext">Checks file type and resolution before "uploading"</div>
+                <div class="upload-subtext" style="font-weight: 600; margin-top: 1rem;">
+                    (Supports .MP4 and .MOV)
+                </div>
+            </div>
+        </label>
+        
+        <input type="file" id="file-input" accept="video/*">
+        
+        <div id="feedback-area">
+            <h3>File Analysis Report</h3>
+            <div class-="feedback-item">
+                <span>File Name:</span>
+                <span id="file-name">...</span>
+            </div>
+            <div class="feedback-item">
+                <span>File Type:</span>
+                <span id="file-type">...</span>
+            </div>
+            <div class="feedback-item">
+                <span>Resolution:</span>
+                <span id="file-resolution">...</span>
+            </div>
+            <hr style="border: 0; border-top: 1px solid #eee; margin: 1rem 0;">
+            <div class="feedback-item">
+                <span>Type Status:</span>
+                <span id="status-type" class="status">...</span>
+            </div>
+            <div class="feedback-item">
+                <span>Resolution Status:</span>
+                <span id="status-res" class="status">...</span>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Get all the DOM elements we need to interact with
+        const fileInput = document.getElementById('file-input');
+        const dropZone = document.getElementById('drop-zone');
+        const feedbackArea = document.getElementById('feedback-area');
+        
+        // File Info Elements
+        const elFileName = document.getElementById('file-name');
+        const elFileType = document.getElementById('file-type');
+        const elFileRes = document.getElementById('file-resolution');
+        
+        // Status Elements
+        const elStatusType = document.getElementById('status-type');
+        const elStatusRes = document.getElementById('status-res');
+
+        // Listen for the user selecting a file
+        fileInput.addEventListener('change', (event) => {
+            const file = event.target.files[0];
+            if (file) {
+                analyseFile(file);
+            }
+        });
+
+        // --- Drag and Drop Functionality (Optional but good for UX) ---
+        dropZone.addEventListener('dragover', (event) => {
+            event.preventDefault(); // Prevent default browser behavior (opening file)
+            dropZone.style.borderColor = '#ff0050';
+        });
+        dropZone.addEventListener('dragleave', () => {
+            dropZone.style.borderColor = '#d9d9d9';
+        });
+        dropZone.addEventListener('drop', (event) => {
+            event.preventDefault();
+            dropZone.style.borderColor = '#d9d9d9';
+            const file = event.dataTransfer.files[0];
+            if (file && file.type.startsWith('video/')) {
+                fileInput.files = event.dataTransfer.files; // Assign file to input
+                analyseFile(file);
+            } else {
+                alert("Please drop a video file.");
+            }
+        });
+        // --- End Drag and Drop ---
+
+        function analyseFile(file) {
+            // Make the feedback area visible
+            feedbackArea.style.display = 'block';
+
+            // 1. Check File Name and Type (Simple Check)
+            elFileName.textContent = file.name;
+            const fileExtension = file.name.split('.').pop().toLowerCase();
+            elFileType.textContent = fileExtension.toUpperCase();
+
+            // Validate the file type
+            if (fileExtension === 'mp4' || fileExtension === 'mov') {
+                elStatusType.textContent = 'Valid';
+                elStatusType.className = 'status success';
+            } else {
+                elStatusType.textContent = 'Error: Invalid Format';
+                elStatusType.className = 'status error';
+            }
+
+            // 2. Check Resolution (Complex Check)
+            // We need to load the file's metadata
+            
+            // Create a <video> element in memory (it's never shown on screen)
+            const video = document.createElement('video');
+            video.preload = 'metadata'; // We only need the metadata, not the whole video
+
+            // This is the clever part:
+            // We create a temporary URL for the file on the user's *own* computer.
+            // The file never gets uploaded.
+            const objectURL = URL.createObjectURL(file);
+            video.src = objectURL;
+
+            // Add an event listener to fire when the metadata (width, height) is loaded
+            video.onloadedmetadata = () => {
+                // Now we can read the properties
+                const width = video.videoWidth;
+                const height = video.videoHeight;
+                elFileRes.textContent = `${width}px x ${height}px`;
+
+                // Validate the resolution (e.g., for a 9:16 TikTok)
+                if (width === 1080 && height === 1920) {
+                    elStatusRes.textContent = 'Perfect! (1080x1920)';
+                    elStatusRes.className = 'status success';
+                } else if (height > width) {
+                    elStatusRes.textContent = 'Warning: Correct Ratio (9:16)';
+                    elStatusRes.className = 'status success'; // Still valid
+                } else {
+                    elStatusRes.textContent = 'Error: Wrong Aspect Ratio (Not 9:16)';
+                    elStatusRes.className = 'status error';
+                }
+
+                // Clean up the temporary URL to free up memory
+                URL.revokeObjectURL(objectURL);
+            };
+            
+            // Handle cases where the file is corrupt or not a video
+            video.onerror = () => {
+                elFileRes.textContent = 'N/A (Cannot read video)';
+                elStatusRes.textContent = 'Error: Corrupt File?';
+                elStatusRes.className = 'status error';
+                URL.revokeObjectURL(objectURL); // Clean up
+            };
+        }
+    </script>
+
+</body>
+</html>
