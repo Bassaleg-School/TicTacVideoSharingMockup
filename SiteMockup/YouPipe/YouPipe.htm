@@ -6,8 +6,36 @@
     <title>YouPipe Upload Studio</title>
     <!-- Link to the external CSS file -->
     <link rel="stylesheet" href="youpipe.css">
+    <!-- Minimal styling for the top-left back button -->
+    <style>
+        .back-button{
+            position: fixed;
+            top: 12px;
+            left: 12px;
+            width: 40px;
+            height: 40px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            background: rgba(0,0,0,0.6);
+            color: #fff;
+            border-radius: 6px;
+            text-decoration: none;
+            z-index: 9999;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.2);
+        }
+        .back-button svg{ width:20px; height:20px; fill: #fff; }
+        .back-button:focus{ outline: 2px solid #fff; }
+    </style>
 </head>
 <body>
+
+    <a href="../index.html" class="back-button" aria-label="Back to index" title="Back to index">
+        <!-- Left arrow icon -->
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+            <path d="M15.41 7.41L14 6l-6 6 6 6 1.41-1.41L10.83 12z"/>
+        </svg>
+    </a>
 
     <div class="uploader-container">
         <!-- The header mimics the YouTube logo style -->
