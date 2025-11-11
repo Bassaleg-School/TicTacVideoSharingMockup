@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+<html lang="en-GB">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Billbook Uploader</title>
+    
+    <style>
+        /* CSS from TicTacUploader.css, adapted for Billbook */
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background-color: #E9EBEE; /* Facebook-ish Grey */
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            margin: 0;
+            color: #1c1e21;
+        }
+        .uploader-container {
+            background-color: #ffffff;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1), 0 8px 16px rgba(0, 0, 0, 0.1);
+            width: 90%;
+            max-width: 500px;
+            padding: 1.5rem;
+            text-align: center;
+        }
+        /* New Billbook Branding */
+        .header {
+            font-size: 2.5rem;
+            font-weight: 700;
+            color: #1877F2; /* Facebook Blue */
+            letter-spacing: -1px;
+        }
+                
+        .upload-box {
+            border: 2px dashed #CCD0D5;
+            border-radius: 8px;
+            padding: 2rem;
+            margin-top: 1.5rem;
+            cursor: pointer;
+            transition: border-color 0.3s, background-color 0.3s;
+        }
+        .upload-box:hover {
+            border-color: #1877F2;
+            background-color: #F0F2F5;
+        }
+        .upload-icon {
+            font-size: 3rem;
+            color: #1877F2;
+        }
+        .upload-text {
+            font-size: 1.1rem;
+            font-weight: 600;
+            margin-top: 1rem;
+        }
+        .upload-subtext {
+            font-size: 0.9rem;
+            color: #606770;
+            margin-top: 0.5rem;
+        }
+                
+        #file-input {
+            display: none;
+        }
+                
+        /* Feedback Area */
+        #feedback-area {
+            margin-top: 1.5rem;
+            text-align: left;
+            font-size: 0.95rem;
+            line-height: 1.6;
+            min-height: 120px; /* Reduced height */
+            background-color: #F0F2F5;
+            border: 1px solid #E9EBEE;
+            border-radius: 8px;
+            padding: 1rem;
+            display: grid;
+            grid-template-columns: 120px 1fr 1fr;
+            gap: 0.75rem;
+            align-items: center;
+        }
+        #feedback-area > span:nth-child(3n+1) {
+            font-weight: 600;
+            color: #4B4F56;
+        }
+        .status {
+            font-weight: 600;
+        }
+        .status.success {
+            color: #388E3C; /* Green */
+        }
+        .status.error {
+            color: #D32F2F; /* Red */
+        }
+        .status.pending {
+            color: #606770; /* Grey */
+        }
+    </style>
+</head>
+<body>
+
+    <div class="uploader-container">
+        <div class="header">
+            billbook 🦆
+        </div>
+        
+        <label for="file-input">
+            <div class="upload-box" id="drop-zone">
+                <div class="upload-icon">🖼️</div>
+                <div class="upload-text">Upload Duckling Videos</div>
+                <div class="upload-subtext">Checks file type & size (Max 50MB)</div>
+                <div class="upload-subtext">(Supports .MP4, .MOV, .AVI)</div>
+            </div>
+        </label>
+        
+        <input typef="file" id="file-input" accept="video/mp4,video/quicktime,video/x-msvideo">
+        
+        <div id="feedback-area">
+            <span>File Name:</span>
+            <span id="file-name">...</span>
+            <span id="status-name" class="status"></span>
+
+            <span>File Type:</span>
+            <span id="file-type">...</span>
+            <span id="status-type" class="status"></span>
+
+            <span>File Size:</span>
+            <span id="file-size">...</span>
+            <span id="status-size" class="status"></span>
+
+            <span>Codec (H.264/5):</span>
+            <span id="file-codec">...</span>
+            <span id="status-codec" class="status pending">Checked on server</span>
+        </div>
+    </div>
+
+    <script>
+        const fileInput = document.getElementById('file-input');
+        const dropZone = document.getElementById('drop-zone');
+
+        // Get feedback elements
+        const elFileName = document.getElementById('file-name');
+        const elFileType = document.getElementById('file-type');
+        const elFileSize = document.getElementById('file-size');
+        const elFileCodec = document.getElementById('file-codec');
+
+        const elStatusName = document.getElementById('status-name');
+        const elStatusType = document.getElementById('status-type');
+        const elStatusSize = document.getElementById('status-size');
+        const elStatusCodec = document.getElementById('status-codec');
+
+        const MAX_SIZE_MB = 50; // Billbook max file size
+        const ALLOWED_TYPES = [
+            'video/mp4', 
+            'video/quicktime', // .mov
+            'video/x-msvideo'  // .avi
+        ];
+
+        // Listen for file selection
+        fileInput.addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (file) {
+                analyseFile(file);
+            }
+        });
+
+        // Drag and Drop listeners
+        dropZone.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            dropZone.style.borderColor = '#1877F2';
+            dropZone.style.backgroundColor = '#F0F2F5';
+        });
+        dropZone.addEventListener('dragleave', () => {
+            dropZone.style.borderColor = '#CCD0D5';
+            dropZone.style.backgroundColor = 'transparent';
+        });
+        dropZone.addEventListener('drop', (e) => {
+            e.preventDefault();
+            dropZone.style.borderColor = '#CCD0D5';
+            dropZone.style.backgroundColor = 'transparent';
+            
+            const file = e.dataTransfer.files[0];
+            if (file) {
+                fileInput.files = e.dataTransfer.files; 
+                analyseFile(file);
+            }
+        });
+
+
+        function analyseFile(file) {
+            // 1. File Name
+            elFileName.textContent = file.name;
+            elStatusName.textContent = 'Loaded';
+            elStatusName.className = 'status success';
+
+            // 2. File Type (MIME)
+            elFileType.textContent = file.type || 'Unknown';
+            if (ALLOWED_TYPES.includes(file.type)) {
+                elStatusType.textContent = 'OK';
+                elStatusType.className = 'status success';
+            } else {
+                elStatusType.textContent = 'Error: Must be .MP4, .MOV, or .AVI';
+                elStatusType.className = 'status error';
+            }
+
+            // 3. File Size
+            const fileSizeMB = file.size / 1024 / 1024;
+            elFileSize.textContent = `${fileSizeMB.toFixed(2)} MB`;
+            if (fileSizeMB <= MAX_SIZE_MB) {
+                elStatusSize.textContent = `OK (Under ${MAX_SIZE_MB}MB)`;
+                elStatusSize.className = 'status success';
+            } else {
+                elStatusSize.textContent = `Error: File larger than ${MAX_SIZE_MB}MB`;
+                elStatusSize.className = 'status error';
+            }
+
+            // 4. Codec, Resolution, Duration
+            // We cannot check these reliably on the client side for
+            // AVI and H.265 files. We must skip this validation
+            // and leave it for the server.
+            elFileCodec.textContent = 'N/A (Client-side)';
+            elStatusCodec.textContent = 'Checked after upload';
+            elStatusCodec.className = 'status pending';
+        }
+    </script>
+
+</body>
+</html>
