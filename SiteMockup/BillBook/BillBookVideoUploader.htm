@@ -200,17 +200,7 @@
             elStatusName.textContent = 'Loaded';
             elStatusName.className = 'status success';
 
-            // 2. File Type (MIME)
-            elFileType.textContent = file.type || 'Unknown';
-            if (ALLOWED_TYPES.includes(file.type)) {
-                elStatusType.textContent = 'OK';
-                elStatusType.className = 'status success';
-            } else {
-                elStatusType.textContent = 'Error: Must be .MP4 (H.264) or .AVI (H.264/uncompressed)';
-                elStatusType.className = 'status error';
-            }
-
-            // 3. File Size
+            // Basic file info
             const fileSizeMB = file.size / 1024 / 1024;
             elFileSize.textContent = `${fileSizeMB.toFixed(2)} MB`;
             if (fileSizeMB <= MAX_SIZE_MB) {
@@ -221,66 +211,94 @@
                 elStatusSize.className = 'status error';
             }
 
-            // 4. Resolution (min 480p) and codec check
-            if (file.type === 'video/mp4') {
+            // Determine extension (prefer file name) and type display
+            const lowerName = (file.name || '').toLowerCase();
+            const ext = lowerName.includes('.') ? lowerName.split('.').pop() : '';
+            const isAviExt = ext === 'avi' || file.type === 'video/x-msvideo';
+            const isMp4 = ext === 'mp4' || file.type === 'video/mp4';
+
+            elFileType.textContent = ext ? ext.toUpperCase() : (file.type || 'Unknown');
+
+            // We accept either: any .avi file (extension) OR an MP4 that is H.264 encoded.
+            if (!isAviExt && !isMp4) {
+                elStatusType.textContent = 'Error: Only .MP4 (H.264) or .AVI allowed';
+                elStatusType.className = 'status error';
+                elFileCodec.textContent = 'N/A';
+                elStatusCodec.textContent = 'Error: Unsupported container';
+                elStatusCodec.className = 'status error';
+                return;
+            }
+
+            // Mark type OK visually
+            elStatusType.textContent = 'OK';
+            elStatusType.className = 'status success';
+
+            // Now enforce resolution + codec rules depending on container
+            if (isMp4) {
+                // For MP4 we require H.264. Use video element to get resolution and canPlayType as best-effort codec hint.
                 const video = document.createElement('video');
                 video.preload = 'metadata';
                 video.onloadedmetadata = function() {
                     window.URL.revokeObjectURL(video.src);
                     elFileCodec.textContent = `${video.videoWidth}x${video.videoHeight}`;
-                    // Try to check codec using canPlayType (not foolproof, but best effort)
-                    let isH264 = false;
-                    if (video.canPlayType('video/mp4; codecs="avc1.42E01E"') || video.canPlayType('video/mp4; codecs="avc1.64001F"')) {
-                        isH264 = true;
-                    }
-                    if (video.videoHeight >= 480 && isH264) {
-                        elStatusCodec.textContent = 'OK (≥ 480p, H.264)';
-                        elStatusCodec.className = 'status success';
-                    } else if (video.videoHeight < 480) {
+
+                    const heightOK = video.videoHeight >= 480;
+                    // best-effort H.264 check using canPlayType; treat failure as a client-side reject
+                    const canAvc1 = video.canPlayType('video/mp4; codecs="avc1.42E01E"');
+                    const canAvc2 = video.canPlayType('video/mp4; codecs="avc1.64001F"');
+                    const isH264 = !!(canAvc1 || canAvc2);
+
+                    if (!heightOK) {
                         elStatusCodec.textContent = 'Error: Min resolution is 480p';
                         elStatusCodec.className = 'status error';
+                        return;
+                    }
+
+                    if (isH264) {
+                        elStatusCodec.textContent = 'OK (≥ 480p, H.264)';
+                        elStatusCodec.className = 'status success';
                     } else {
-                        elStatusCodec.textContent = 'Error: Only H.264 encoded MP4 allowed';
+                        // canPlayType may be unreliable in some browsers, but per policy we require H.264 for MP4
+                        elStatusCodec.textContent = 'Error: MP4 must be H.264 encoded';
                         elStatusCodec.className = 'status error';
                     }
                 };
                 video.onerror = function() {
                     elFileCodec.textContent = 'Unknown';
-                    elStatusCodec.textContent = 'Error: Could not read video resolution/codec';
+                    elStatusCodec.textContent = 'Error: Could not read MP4 metadata';
                     elStatusCodec.className = 'status error';
                 };
                 video.src = URL.createObjectURL(file);
-            } else if (file.type === 'video/x-msvideo') {
-                // Cannot check AVI codec client-side; allow H.264 or uncompressed, check server-side
-                elFileCodec.textContent = 'N/A (Client-side)';
-                    // Try to read AVI headers client-side to detect codec and resolution (best-effort)
-                    readAviHeaders(file).then(info => {
-                        const codec = info.codec || 'Unknown';
-                        const width = info.width || null;
-                        const height = info.height || null;
-                        elFileCodec.textContent = codec + (width && height ? ` — ${width}x${height}` : '');
+            } else if (isAviExt) {
+                // For AVI: accept the container regardless of client-detected codec; enforce resolution >= 480 if we can read it.
+                elFileCodec.textContent = 'Parsing...';
+                elStatusCodec.textContent = 'Checking (client-side)';
+                elStatusCodec.className = 'status pending';
 
-                        const codecLower = (codec || '').toLowerCase();
-                        // Accept common AVI codecs we allow (v210 is an acceptable uncompressed/10-bit format here)
-                        if (codecLower.includes('v210') || codecLower.includes('yuv') || codecLower.includes('raw')) {
-                            elStatusCodec.textContent = `OK (${codec})`;
+                readAviHeaders(file).then(info => {
+                    const codec = info.codec || 'Unknown';
+                    const width = info.width || null;
+                    const height = info.height || null;
+                    elFileCodec.textContent = codec + (width && height ? ` — ${width}x${height}` : '');
+
+                    if (width && height) {
+                        if (Math.abs(height) >= 480) {
+                            elStatusCodec.textContent = `OK (≥480p)`;
                             elStatusCodec.className = 'status success';
-                        } else if (codec === 'Unknown') {
-                            elStatusCodec.textContent = 'Checked after upload (unknown client-side)';
-                            elStatusCodec.className = 'status pending';
                         } else {
-                            elStatusCodec.textContent = `Checked after upload (detected ${codec})`;
-                            elStatusCodec.className = 'status pending';
+                            elStatusCodec.textContent = 'Error: Min resolution is 480p';
+                            elStatusCodec.className = 'status error';
                         }
-                    }).catch(err => {
-                        elFileCodec.textContent = 'Unknown';
-                        elStatusCodec.textContent = 'Error: Could not read AVI headers';
-                        elStatusCodec.className = 'status error';
-                    });
-            } else {
-                elFileCodec.textContent = 'N/A';
-                elStatusCodec.textContent = 'Error: Only .mp4 (H.264) or .avi (H.264/uncompressed) files allowed';
-                elStatusCodec.className = 'status error';
+                    } else {
+                        // Could not determine resolution client-side — mark pending and allow server-side verification
+                        elStatusCodec.textContent = 'Checked after upload (resolution unknown client-side)';
+                        elStatusCodec.className = 'status pending';
+                    }
+                }).catch(err => {
+                    elFileCodec.textContent = 'Unknown';
+                    elStatusCodec.textContent = 'Checked after upload (could not parse headers)';
+                    elStatusCodec.className = 'status pending';
+                });
             }
         }
 
