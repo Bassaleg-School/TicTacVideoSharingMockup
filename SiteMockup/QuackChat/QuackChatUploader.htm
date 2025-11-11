@@ -17,6 +17,8 @@
             margin: 0;
             color: #333;
         }
+
+        
         .uploader-container {
             background-color: #ffffff;
             border-radius: 12px;
@@ -177,8 +179,8 @@
         const elStatusLength = document.getElementById('status-length'); // New
         const elStatusSize = document.getElementById('status-size'); // New
 
-        const MAX_SIZE_MB = 32; // Snapchat max file size
-        const MAX_DURATION_S = 60; // Snapchat max duration
+    const MAX_SIZE_MB = 15; // QuackChat max file size (MB)
+        const MAX_DURATION_S = 60; // QuackChat max duration (s)
 
         // Listen for file selection
         fileInput.addEventListener('change', (e) => {
@@ -226,6 +228,29 @@
                 elStatusType.textContent = 'Error: Must be .MP4 or .MOV';
                 elStatusType.className = 'status error';
             }
+
+            // Detect codec (H.264 / H.265 only). This is a best-effort check by scanning
+            // the first chunk of the file for common sample entry strings (avc1, hvc1, hev1).
+            // If detection fails or the markers aren't found, we treat it as unknown.
+            elFileCodec.textContent = 'Detecting...';
+            elStatusCodec.textContent = '';
+            detectCodec(file).then(codec => {
+                elFileCodec.textContent = codec || 'Unknown';
+                if (codec === 'h264') {
+                    elStatusCodec.textContent = 'OK (H.264)';
+                    elStatusCodec.className = 'status success';
+                } else if (codec === 'h265') {
+                    elStatusCodec.textContent = 'OK (H.265)';
+                    elStatusCodec.className = 'status success';
+                } else {
+                    elStatusCodec.textContent = 'Error: Codec not H.264/H.265';
+                    elStatusCodec.className = 'status error';
+                }
+            }).catch(() => {
+                elFileCodec.textContent = 'Detect Failed';
+                elStatusCodec.textContent = 'Error: Cannot detect codec';
+                elStatusCodec.className = 'status error';
+            });
 
             // 3. File Size (NEW)
             const fileSizeMB = file.size / 1024 / 1024;
@@ -290,6 +315,39 @@
                 // Size check still valid, so we don't reset that
                 URL.revokeObjectURL(objectURL); // Clean up
             };
+        }
+
+        // Lightweight codec detection by scanning the first chunk of the file for sample entry strings
+        // Note: this is a heuristic. It assumes the file contains codec identifiers (e.g. 'avc1', 'hvc1', 'hev1')
+        // within the first checked bytes (common for web-optimized MP4/MOV). If not found, detection may fail.
+        function detectCodec(file) {
+            const CHUNK_SIZE = Math.min(file.size, 1024 * 1024); // read up to 1MB
+            return new Promise((resolve, reject) => {
+                const blob = file.slice(0, CHUNK_SIZE);
+                const reader = new FileReader();
+                reader.onerror = () => reject(new Error('File read error'));
+                reader.onload = () => {
+                    try {
+                        const buffer = reader.result;
+                        const decoder = new TextDecoder('utf-8');
+                        const text = decoder.decode(buffer);
+                        // look for common codec markers
+                        if (text.indexOf('avc1') !== -1 || text.indexOf('mp4v') !== -1) {
+                            resolve('h264');
+                            return;
+                        }
+                        if (text.indexOf('hvc1') !== -1 || text.indexOf('hev1') !== -1) {
+                            resolve('h265');
+                            return;
+                        }
+                        // not found
+                        resolve('unknown');
+                    } catch (err) {
+                        reject(err);
+                    }
+                };
+                reader.readAsArrayBuffer(blob);
+            });
         }
     </script>
 
