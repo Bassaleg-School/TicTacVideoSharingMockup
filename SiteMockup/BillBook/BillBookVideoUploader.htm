@@ -116,12 +116,12 @@
             <div class="upload-box" id="drop-zone">
                 <div class="upload-icon">🖼️</div>
                 <div class="upload-text">Upload Duckling Videos</div>
-                <div class="upload-subtext">Checks file type, size (Max 50MB), and minimum 480p resolution</div>
-                <div class="upload-subtext">(Supports .MP4, .MOV, .AVI; 480p+ required)</div>
+                <div class="upload-subtext">Checks file type, size (Max 50MB), minimum 480p, and codec</div>
+                <div class="upload-subtext">(Supports .MP4 [H.264], .AVI [H.264 or uncompressed], 480p+ required)</div>
             </div>
         </label>
         
-        <input typef="file" id="file-input" accept="video/mp4,video/quicktime,video/x-msvideo">
+    <input type="file" id="file-input" accept="video/mp4,video/x-msvideo">
         
         <div id="feedback-area">
             <span>File Name:</span>
@@ -136,7 +136,7 @@
             <span id="file-size">...</span>
             <span id="status-size" class="status"></span>
 
-            <span>Resolution:</span>
+            <span>Resolution & Codec:</span>
             <span id="file-codec">...</span>
             <span id="status-codec" class="status pending">Checked on upload</span>
         </div>
@@ -159,9 +159,8 @@
 
         const MAX_SIZE_MB = 50; // Billbook max file size
         const ALLOWED_TYPES = [
-            'video/mp4', 
-            'video/quicktime', // .mov
-            'video/x-msvideo'  // .avi
+            'video/mp4',
+            'video/x-msvideo' // .avi
         ];
 
         // Listen for file selection
@@ -207,7 +206,7 @@
                 elStatusType.textContent = 'OK';
                 elStatusType.className = 'status success';
             } else {
-                elStatusType.textContent = 'Error: Must be .MP4, .MOV, or .AVI';
+                elStatusType.textContent = 'Error: Must be .MP4 (H.264) or .AVI (H.264/uncompressed)';
                 elStatusType.className = 'status error';
             }
 
@@ -222,32 +221,44 @@
                 elStatusSize.className = 'status error';
             }
 
-            // 4. Resolution (min 480p) check for MP4 and MOV (client-side)
-            if (file.type === 'video/mp4' || file.type === 'video/quicktime') {
+            // 4. Resolution (min 480p) and codec check
+            if (file.type === 'video/mp4') {
                 const video = document.createElement('video');
                 video.preload = 'metadata';
                 video.onloadedmetadata = function() {
                     window.URL.revokeObjectURL(video.src);
                     elFileCodec.textContent = `${video.videoWidth}x${video.videoHeight}`;
-                    if (video.videoHeight >= 480) {
-                        elStatusCodec.textContent = 'OK (≥ 480p)';
+                    // Try to check codec using canPlayType (not foolproof, but best effort)
+                    let isH264 = false;
+                    if (video.canPlayType('video/mp4; codecs="avc1.42E01E"') || video.canPlayType('video/mp4; codecs="avc1.64001F"')) {
+                        isH264 = true;
+                    }
+                    if (video.videoHeight >= 480 && isH264) {
+                        elStatusCodec.textContent = 'OK (≥ 480p, H.264)';
                         elStatusCodec.className = 'status success';
-                    } else {
+                    } else if (video.videoHeight < 480) {
                         elStatusCodec.textContent = 'Error: Min resolution is 480p';
+                        elStatusCodec.className = 'status error';
+                    } else {
+                        elStatusCodec.textContent = 'Error: Only H.264 encoded MP4 allowed';
                         elStatusCodec.className = 'status error';
                     }
                 };
                 video.onerror = function() {
                     elFileCodec.textContent = 'Unknown';
-                    elStatusCodec.textContent = 'Error: Could not read video resolution';
+                    elStatusCodec.textContent = 'Error: Could not read video resolution/codec';
                     elStatusCodec.className = 'status error';
                 };
                 video.src = URL.createObjectURL(file);
-            } else {
-                // Cannot check AVI reliably client-side
+            } else if (file.type === 'video/x-msvideo') {
+                // Cannot check AVI codec client-side; allow H.264 or uncompressed, check server-side
                 elFileCodec.textContent = 'N/A (Client-side)';
-                elStatusCodec.textContent = 'Checked after upload';
+                elStatusCodec.textContent = 'Checked after upload (must be H.264 or uncompressed)';
                 elStatusCodec.className = 'status pending';
+            } else {
+                elFileCodec.textContent = 'N/A';
+                elStatusCodec.textContent = 'Error: Only .mp4 (H.264) or .avi (H.264/uncompressed) files allowed';
+                elStatusCodec.className = 'status error';
             }
         }
     </script>
