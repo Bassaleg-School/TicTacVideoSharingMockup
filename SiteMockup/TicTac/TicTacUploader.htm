@@ -43,6 +43,14 @@
                 <span id="file-name">...</span>
             </div>
             <div class="feedback-item">
+                <span>File Size:</span>
+                <span id="file-size">...</span>
+            </div>
+            <div class="feedback-item">
+                <span>Duration:</span>
+                <span id="file-duration">...</span>
+            </div>
+            <div class="feedback-item">
                 <span>File Type:</span>
                 <span id="file-type">...</span>
             </div>
@@ -72,10 +80,16 @@
         const elFileName = document.getElementById('file-name');
         const elFileType = document.getElementById('file-type');
         const elFileRes = document.getElementById('file-resolution');
+    const elFileSize = document.getElementById('file-size');
+    const elFileDuration = document.getElementById('file-duration');
         
         // Status Elements
         const elStatusType = document.getElementById('status-type');
         const elStatusRes = document.getElementById('status-res');
+
+        // Configuration: limits
+        const MAX_DURATION = 60; // seconds
+        const MAX_FILE_SIZE = 40 * 1024 * 1024; // 40 MiB in bytes
 
         // Listen for the user selecting a file
         fileInput.addEventListener('change', (event) => {
@@ -115,13 +129,22 @@
             const fileExtension = file.name.split('.').pop().toLowerCase();
             elFileType.textContent = fileExtension.toUpperCase();
 
+            // File size
+            elFileSize.textContent = (file.size / (1024 * 1024)).toFixed(2) + ' MiB';
+
             // Validate the file type
-            if (fileExtension === 'mp4' || fileExtension === 'mov') {
+            const typeValid = (fileExtension === 'mp4' || fileExtension === 'mov');
+            const sizeValid = file.size <= MAX_FILE_SIZE;
+
+            if (!typeValid) {
+                elStatusType.textContent = 'Error: Invalid Format (supports .mp4, .mov)';
+                elStatusType.className = 'status error';
+            } else if (!sizeValid) {
+                elStatusType.textContent = 'Error: File too large (max 40 MiB)';
+                elStatusType.className = 'status error';
+            } else {
                 elStatusType.textContent = 'Valid';
                 elStatusType.className = 'status success';
-            } else {
-                elStatusType.textContent = 'Error: Invalid Format';
-                elStatusType.className = 'status error';
             }
 
             // 2. Check Resolution (Complex Check)
@@ -142,18 +165,34 @@
                 // Now we can read the properties
                 const width = video.videoWidth;
                 const height = video.videoHeight;
+                const duration = video.duration; // seconds
+
+                elFileDuration.textContent = duration ? duration.toFixed(2) + ' s' : 'N/A';
                 elFileRes.textContent = `${width}px x ${height}px`;
 
-                // Validate the resolution (e.g., for a 9:16 TikTok)
-                if (width === 1080 && height === 1920) {
-                    elStatusRes.textContent = 'Perfect! (1080x1920)';
-                    elStatusRes.className = 'status success';
-                } else if (height > width) {
-                    elStatusRes.textContent = 'Warning: Correct Ratio (9:16)';
-                    elStatusRes.className = 'status success'; // Still valid
-                } else {
+                // Validate the resolution/aspect ratio and duration
+                // Require a 9:16 aspect ratio (allow a small tolerance)
+                const expectedRatio = 9 / 16; // width / height
+                const ratio = width / height;
+                const TOLERANCE = 0.03; // 3% tolerance
+                const aspectOk = Math.abs(ratio - expectedRatio) <= TOLERANCE;
+                const durationOk = typeof duration === 'number' && !isNaN(duration) && duration <= MAX_DURATION;
+
+                // Build resolution/duration status message
+                if (!aspectOk) {
                     elStatusRes.textContent = 'Error: Wrong Aspect Ratio (Not 9:16)';
                     elStatusRes.className = 'status error';
+                } else if (!durationOk) {
+                    elStatusRes.textContent = `Error: Duration exceeds ${MAX_DURATION}s`;
+                    elStatusRes.className = 'status error';
+                } else {
+                    // If both aspect and duration are ok
+                    if (width === 1080 && height === 1920) {
+                        elStatusRes.textContent = 'Perfect! (1080x1920)';
+                    } else {
+                        elStatusRes.textContent = 'Valid (9:16)';
+                    }
+                    elStatusRes.className = 'status success';
                 }
 
                 // Clean up the temporary URL to free up memory
