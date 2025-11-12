@@ -36,6 +36,13 @@
         }
         .header span:first-child { color: #FFD700; /* Duck Yellow */ }
         .header span:last-child { color: #0077BE; /* Water Blue */ }
+        /* Title logo (replaces emoji). Sized to match 2.5rem title (~40px). */
+        .title-logo {
+            width: 40px;
+            height: 40px;
+            vertical-align: middle; /* align with text */
+            margin-left: 0.35rem;
+        }
         /* Tagline styling: subtle, slightly italic and smaller than the title */
         .tagline {
             font-size: 0.95rem;
@@ -118,7 +125,8 @@
 
     <div class="uploader-container">
         <div class="header">
-            <span>Quack</span><span>Chat 🦆</span>
+            <span>Quack</span>
+            <span>Chat <img src="quackChatLogo.png" alt="QuackChat logo" class="title-logo" /></span>
         </div>
         <p class="tagline">the newest service for privacy conscious ducks</p>
         
